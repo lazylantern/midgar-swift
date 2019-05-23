@@ -1,0 +1,16 @@
+PODS:
+  - Midgar-Swift (0.1.0)
+
+DEPENDENCIES:
+  - Midgar-Swift (from `../`)
+
+EXTERNAL SOURCES:
+  Midgar-Swift:
+    :path: "../"
+
+SPEC CHECKSUMS:
+  Midgar-Swift: bf78807b074979a0ca6b9cb26d3be3f3f005fef6
+
+PODFILE CHECKSUM: 01f0b049eb9e90275736792d69bb0fdbf818a47b
+
+COCOAPODS: 1.7.0
