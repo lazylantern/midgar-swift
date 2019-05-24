@@ -10,54 +10,57 @@ Objective-C SDK is available at https://github.com/lazylantern/midgar-objc.git.
 
 Midgar is available through CocoaPods. 
 
-To install it, simply add the following line to your Podfile:
+To install it, add the source and pod to your Podfile as follow:
 
 ```ruby
-pod 'MidgarSwift', :git => 'https://github.com/lazylantern/midgar-swift.git'
+platform :ios, 'x.0'
+
+# Your other sources...
+source 'https://github.com/lazylantern/MidgarSwiftPodSpecs.git' # Add this line (1 out of 2).
+
+target 'your-app-name' do
+    use_frameworks!
+
+    # Your other pods...
+    pod 'MidgarSwift' # Add this line (2 out of 2).
+    
+end
 ```
 
 Run `pod install`.
 
 The integration entirely happens in the `AppDelegate.swift` implementation file.
 
-Import the header file:
+Import the module:
 
 ```
-#import "Midgar.h"
+import MidgarSwift
 ```
 
-Declare the `midgarWindow` property:
+Declare the `midgarWindow` variable and modify the `window` property getter to return the `midgarWindow`:
 
 ```
-@interface AppDelegate ()
+class AppDelegate: UIResponder, UIApplicationDelegate {
 
-@property (nonatomic, strong) MidgarWindow *midgarWindow;
-
-@end
+    var midgarWindow: MidgarWindow?
+    var window: UIWindow? {
+        get {
+            midgarWindow = midgarWindow ?? MidgarWindow(frame: UIScreen.main.bounds)
+            return midgarWindow
+        }
+        set { }
+    }
+    
 ```
 
-Add a getter for the `window` property:
+Start the Midgar SDK in the `applicationDidFinishLaunchingWithOptions` method:
 
 ```
-@implementation AppDelegate
+func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
-- (UIWindow *)window {
-if (!self.midgarWindow) {
-self.midgarWindow = [[MidgarWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-}
-
-return self.midgarWindow;
-}
-```
-
-Start the Midgar SDK:
-
-```
-- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-
-[self.midgarWindow startWithAppToken:@"your-app-token-provided-by-lazy-lantern"];
-
-return YES;
+    midgarWindow?.start(appToken: "abcdefghij") // Add this line.
+    
+    return true
 }
 ```
 
