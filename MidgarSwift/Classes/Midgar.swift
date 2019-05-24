@@ -105,9 +105,9 @@ public class MidgarWindow: UIWindow {
     private func subscribeToNotifications() {
         unsubscribeFromNotifications()
         NotificationCenter.default.addObserver(self, selector: #selector(appForegrounded(_:)),
-                                               name: NSNotification.Name.UIApplicationDidBecomeActive, object: nil)
+                                               name: UIApplication.didBecomeActiveNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(appBackgrounded(_:)),
-                                               name: NSNotification.Name.UIApplicationWillResignActive, object: nil)
+                                               name: UIApplication.willResignActiveNotification, object: nil)
     }
     
     private func unsubscribeFromNotifications() {
