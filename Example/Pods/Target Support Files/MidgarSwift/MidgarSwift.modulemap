@@ -1,0 +1,6 @@
+framework module MidgarSwift {
+  umbrella header "MidgarSwift-umbrella.h"
+
+  export *
+  module * { export * }
+}
