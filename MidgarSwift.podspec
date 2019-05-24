@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'MidgarSwift'
-  s.version          = '0.1.3'
+  s.version          = '0.1.4'
   s.summary          = 'Midgar Swift SDK for Lazy Lantern.'
   s.description      = <<-DESC
   TODO: Add long description of the pod here.
