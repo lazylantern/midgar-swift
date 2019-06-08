@@ -13,6 +13,8 @@ fileprivate struct Const {
     static let EventTypeImpression = "impression"
     static let EventTypeForeground = "foreground"
     static let EventTypeBackground = "background"
+    static let SessionIdLength = 6
+    static let SessionExpiration = 10 * 60 * 1000 // 10 mins in milliseconds
     
 }
 
@@ -93,7 +95,15 @@ public class MidgarWindow: UIWindow {
     private func uploadEventsIfNeeded() {
         if self.eventBatch.count > 0 {
             MidgarLogger.log("Uploading \(eventBatch.count) events.")
-            self.eventUploadService.uploadBatch(events: self.eventBatch, appToken: self.appToken)
+            self.eventUploadService.uploadBatch(events: self.eventBatch, appToken: self.appToken) { (data, response, error) in
+                DispatchQueue.main.async {
+                    if let httpStatus = response as? HTTPURLResponse, httpStatus.statusCode == 201 {
+                        MidgarLogger.log("Upload successful.")
+                    } else {
+                        MidgarLogger.log("Upload failed.")
+                    }
+                }
+            }
             self.eventBatch = []
         } else {
             MidgarLogger.log("No event to upload.")
@@ -150,11 +160,11 @@ private class EventUploadService: NSObject {
         URLSession.shared.dataTask(with: request, completionHandler: completion).resume()
     }
     
-    func uploadBatch(events: [Event], appToken: String) {
+    func uploadBatch(events: [Event], appToken: String, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
         let parameters: [String: Any] = ["events": events.map { $0.toDict() }, "app_token": appToken]
         let url = Const.BaseUrl + "/events"
         guard let request = createPostRequest(url: url, parameters: parameters) else { return }
-        URLSession.shared.dataTask(with: request).resume() // TODO: retry if failed.
+        URLSession.shared.dataTask(with: request, completionHandler: completion).resume() // TODO: retry if failed.
     }
     
     func createPostRequest(url: String, parameters: [String: Any]) -> URLRequest? {
@@ -181,21 +191,59 @@ private struct Event {
     let screen: String
     let deviceId: String
     let timestamp: Int
+    let sessionId: String
+    let platform: String
+    let sdk: String
     
     init(type: String, screen: String, deviceId: String) {
         self.type = type
         self.screen = screen
         self.deviceId = deviceId
         timestamp = Date().timestamp
-        log()
+        platform = "ios"
+        sdk = "swift"
+        sessionId = Session.sessionId()
+        Session.lastEvent = self
+        MidgarLogger.log("new event -> \(self.toDict())")
     }
     
     func toDict() -> [String: Any] {
-        return ["type": type, "screen": screen, "timestamp": timestamp]
+        return ["type": type,
+                "screen": screen,
+                "timestamp": timestamp,
+                "device_id": deviceId,
+                "session_id": sessionId,
+                "platform": platform,
+                "sdk": sdk]
     }
     
-    func log() {
-        MidgarLogger.log("event: \(type), screen \(screen), id \(deviceId), timestamp \(timestamp)")
+}
+
+// ----------------------------------
+// MARK: Session
+// ----------------------------------
+
+private class Session: NSObject {
+    
+    fileprivate static var lastEvent: Event?
+    private static var _sessionId: String?
+    
+    static func sessionId() -> String {
+        guard let sessionId = _sessionId else { // No session id.
+            let sessionId = UuidGenerator.sessionId()
+            _sessionId = sessionId
+            return sessionId
+        }
+        
+        if let event = lastEvent,
+            event.type == Const.EventTypeBackground,
+            Date().timestamp - event.timestamp > Const.SessionExpiration { // Expired session id.
+            let sessionId = UuidGenerator.sessionId()
+            _sessionId = sessionId
+            return sessionId
+        }
+        
+        return sessionId // Valid session id.
     }
     
 }
@@ -241,6 +289,15 @@ private extension Date {
     
     var timestamp: Int {
         return Int(truncatingIfNeeded: Int64((self.timeIntervalSince1970 * 1000.0).rounded()))
+    }
+    
+}
+
+private struct UuidGenerator {
+    
+    static func sessionId() -> String {
+        let letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        return String((0..<Const.SessionIdLength).map{ _ in letters.randomElement()! })
     }
     
 }
