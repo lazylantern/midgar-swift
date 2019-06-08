@@ -8,7 +8,7 @@ fileprivate struct Const {
     
     static let LogsEnabled = false
     static let DetectionFrequency = 0.5 // in seconds
-    static let UploadFrequency = 10.0 // in seconds
+    static let UploadFrequency = 60.0 // in seconds
     static let BaseUrl = "https://midgar-flask.herokuapp.com/api"
     static let EventTypeImpression = "impression"
     static let EventTypeForeground = "foreground"
@@ -86,11 +86,18 @@ public class MidgarWindow: UIWindow {
         })
         
         eventUploadTimer = Timer.scheduledTimer(withTimeInterval: Const.UploadFrequency, repeats: true, block: { (_) in
-            if self.eventBatch.count > 0 {
-                self.eventUploadService.uploadBatch(events: self.eventBatch, appToken: self.appToken)
-                self.eventBatch = []
-            }
+            self.uploadEventsIfNeeded()
         })
+    }
+    
+    private func uploadEventsIfNeeded() {
+        if self.eventBatch.count > 0 {
+            MidgarLogger.log("Uploading \(eventBatch.count) events.")
+            self.eventUploadService.uploadBatch(events: self.eventBatch, appToken: self.appToken)
+            self.eventBatch = []
+        } else {
+            MidgarLogger.log("No event to upload.")
+        }
     }
     
     private func stopMonitoring() {
@@ -124,6 +131,7 @@ public class MidgarWindow: UIWindow {
         self.eventBatch.append(Event(type: Const.EventTypeBackground,
                                      screen: "",
                                      deviceId: deviceId))
+        uploadEventsIfNeeded()
     }
     
 }
