@@ -58,7 +58,7 @@ Start the Midgar SDK in the `applicationDidFinishLaunchingWithOptions` method:
 ```
 func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
-    midgarWindow?.start(appToken: "abcdefghij") // Add this line.
+    midgarWindow?.start(appToken: "your-app-token-provided-by-lazy-lantern") // Add this line.
     
     return true
 }

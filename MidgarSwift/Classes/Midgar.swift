@@ -8,11 +8,13 @@ fileprivate struct Const {
     
     static let LogsEnabled = false
     static let DetectionFrequency = 0.5 // in seconds
-    static let UploadFrequency = 10.0 // in seconds
+    static let UploadFrequency = 60.0 // in seconds
     static let BaseUrl = "https://midgar-flask.herokuapp.com/api"
     static let EventTypeImpression = "impression"
     static let EventTypeForeground = "foreground"
     static let EventTypeBackground = "background"
+    static let SessionIdLength = 6
+    static let SessionExpiration = 10 * 60 * 1000 // 10 mins in milliseconds
     
 }
 
@@ -86,11 +88,26 @@ public class MidgarWindow: UIWindow {
         })
         
         eventUploadTimer = Timer.scheduledTimer(withTimeInterval: Const.UploadFrequency, repeats: true, block: { (_) in
-            if self.eventBatch.count > 0 {
-                self.eventUploadService.uploadBatch(events: self.eventBatch, appToken: self.appToken)
-                self.eventBatch = []
-            }
+            self.uploadEventsIfNeeded()
         })
+    }
+    
+    private func uploadEventsIfNeeded() {
+        if self.eventBatch.count > 0 {
+            MidgarLogger.log("Uploading \(eventBatch.count) events.")
+            self.eventUploadService.uploadBatch(events: self.eventBatch, appToken: self.appToken) { (data, response, error) in
+                DispatchQueue.main.async {
+                    if let httpStatus = response as? HTTPURLResponse, httpStatus.statusCode == 201 {
+                        MidgarLogger.log("Upload successful.")
+                    } else {
+                        MidgarLogger.log("Upload failed.")
+                    }
+                }
+            }
+            self.eventBatch = []
+        } else {
+            MidgarLogger.log("No event to upload.")
+        }
     }
     
     private func stopMonitoring() {
@@ -124,6 +141,7 @@ public class MidgarWindow: UIWindow {
         self.eventBatch.append(Event(type: Const.EventTypeBackground,
                                      screen: "",
                                      deviceId: deviceId))
+        uploadEventsIfNeeded()
     }
     
 }
@@ -142,11 +160,11 @@ private class EventUploadService: NSObject {
         URLSession.shared.dataTask(with: request, completionHandler: completion).resume()
     }
     
-    func uploadBatch(events: [Event], appToken: String) {
+    func uploadBatch(events: [Event], appToken: String, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
         let parameters: [String: Any] = ["events": events.map { $0.toDict() }, "app_token": appToken]
         let url = Const.BaseUrl + "/events"
         guard let request = createPostRequest(url: url, parameters: parameters) else { return }
-        URLSession.shared.dataTask(with: request).resume() // TODO: retry if failed.
+        URLSession.shared.dataTask(with: request, completionHandler: completion).resume() // TODO: retry if failed.
     }
     
     func createPostRequest(url: String, parameters: [String: Any]) -> URLRequest? {
@@ -173,21 +191,203 @@ private struct Event {
     let screen: String
     let deviceId: String
     let timestamp: Int
+    let sessionId: String
+    let platform: String
+    let sdk: String
+    let country: String
+    let osVersion: String
+    let appName: String
+    let versionName: String
+    let versionCode: String
+    let deviceManufacturer: String
+    let deviceModel: String
+    let isEmulator: Bool
     
     init(type: String, screen: String, deviceId: String) {
         self.type = type
         self.screen = screen
         self.deviceId = deviceId
         timestamp = Date().timestamp
-        log()
+        sessionId = Session.sessionId
+        platform = Session.platform
+        sdk = Session.sdk
+        country = Session.country
+        osVersion = Session.osVersion
+        appName = Session.appName
+        versionName = Session.appVersion
+        versionCode = Session.appVersionCode
+        deviceManufacturer = Session.deviceManufacturer
+        deviceModel = Session.deviceModel
+        isEmulator = Session.isEmulator
+        
+        
+        Session.lastEvent = self
+        MidgarLogger.log("new event -> \(self.toDict())")
     }
     
     func toDict() -> [String: Any] {
-        return ["type": type, "screen": screen, "timestamp": timestamp]
+        return ["type": type,
+                "screen": screen,
+                "device_id": deviceId,
+                "timestamp": timestamp,
+                "session_id": sessionId,
+                "platform": platform,
+                "sdk": sdk,
+                "country": country,
+                "os_version": osVersion,
+                "app_name": appName,
+                "version_name": versionName,
+                "version_code": versionCode,
+                "manufacturer": deviceManufacturer,
+                "model": deviceModel,
+                "is_emulator": isEmulator]
     }
     
-    func log() {
-        MidgarLogger.log("event: \(type), screen \(screen), id \(deviceId), timestamp \(timestamp)")
+}
+
+// ----------------------------------
+// MARK: Session
+// ----------------------------------
+
+private class Session: NSObject {
+    
+    fileprivate static var lastEvent: Event?
+    
+    private static var _sessionId: String?
+    static var sessionId: String {
+        get {
+            guard let sessionId = _sessionId else { // No session id.
+                let sessionId = UuidGenerator.sessionId()
+                _sessionId = sessionId
+                return sessionId
+            }
+            
+            if let event = lastEvent,
+                event.type == Const.EventTypeBackground,
+                Date().timestamp - event.timestamp > Const.SessionExpiration { // Expired session id.
+                let sessionId = UuidGenerator.sessionId()
+                _sessionId = sessionId
+                return sessionId
+            }
+            
+            return sessionId // Valid session id.
+        }
+    }
+    
+    private static var _isEmulator: Bool?
+    static var isEmulator: Bool {
+        get {
+            guard _isEmulator == nil else { return _isEmulator! }
+            
+            #if targetEnvironment(simulator)
+            _isEmulator = true
+            #else
+            _isEmulator = false
+            #endif
+            
+            return _isEmulator!
+        }
+    }
+    
+    private static var _appName: String?
+    static var appName: String {
+        get {
+            guard _appName == nil else { return _appName! }
+            
+            _appName = ""
+            if let name = Bundle.main.infoDictionary?[kCFBundleNameKey as String] as? String {
+                _appName = name
+            }
+            
+            return _appName!
+        }
+    }
+    
+    private static var _appVersion: String?
+    static var appVersion: String {
+        get {
+            guard _appVersion == nil else { return _appVersion! }
+            
+            _appVersion = ""
+            if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+                _appVersion = version
+            }
+            
+            return _appVersion!
+        }
+    }
+    
+    private static var _appVersionCode: String?
+    static var appVersionCode: String {
+        get {
+            guard _appVersionCode == nil else { return _appVersionCode! }
+            
+            _appVersionCode = ""
+            if let versionCode = Bundle.main.infoDictionary?[kCFBundleVersionKey as String] as? String {
+                _appVersionCode = versionCode
+            }
+            
+            return _appVersionCode!
+        }
+    }
+    
+    private static var _country: String?
+    static var country: String {
+        get {
+            guard _country == nil else { return _country! }
+            
+            _country = ""
+            if let countryCode = (Locale.current as NSLocale).object(forKey: .countryCode) as? String {
+                _country = countryCode
+            }
+            
+            return _country!
+        }
+    }
+    
+    private static var _osVersion: String?
+    static var osVersion: String {
+        get {
+            guard _osVersion == nil else { return _osVersion! }
+            _osVersion = UIDevice.current.systemVersion
+            return _osVersion!
+        }
+    }
+    
+    static var deviceManufacturer: String {
+        get {
+            return "Apple"
+        }
+    }
+    
+    private static var _deviceModel: String?
+    static var deviceModel: String {
+        get {
+            guard _deviceModel == nil else { return _deviceModel! }
+            
+            var systemInfo = utsname()
+            uname(&systemInfo)
+            let machineMirror = Mirror(reflecting: systemInfo.machine)
+            let identifier = machineMirror.children.reduce("") { identifier, element in
+                guard let value = element.value as? Int8, value != 0 else { return identifier }
+                return identifier + String(UnicodeScalar(UInt8(value)))
+            }
+            
+            _deviceModel = identifier
+            return identifier
+        }
+    }
+    
+    static var sdk: String {
+        get {
+            return "swift"
+        }
+    }
+    
+    static var platform: String {
+        get {
+            return "ios"
+        }
     }
     
 }
@@ -233,6 +433,15 @@ private extension Date {
     
     var timestamp: Int {
         return Int(truncatingIfNeeded: Int64((self.timeIntervalSince1970 * 1000.0).rounded()))
+    }
+    
+}
+
+private struct UuidGenerator {
+    
+    static func sessionId() -> String {
+        let letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        return String((0..<Const.SessionIdLength).map{ _ in letters.randomElement()! })
     }
     
 }
