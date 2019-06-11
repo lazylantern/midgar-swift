@@ -10,7 +10,9 @@ Objective-C SDK is available at https://github.com/lazylantern/midgar-objc.git.
 
 Midgar is available through CocoaPods and Carthage. 
 
-To install it with CocoaPods, add the source and pod to your Podfile as follow:
+### CocoaPods Setup
+
+Add the source and pod to your Podfile as follow:
 
 ```ruby
 platform :ios, 'x.0'
@@ -29,7 +31,15 @@ end
 
 Run `pod install`.
 
-To install with Carthage, add `github "lazylantern/midgar-swift"` to your Cartfile.
+### Carthage Setup
+
+Add `github "lazylantern/midgar-swift"` to your Cartfile.
+
+Run `carthage update`.
+
+Drag the built framework at `Carthage/Build/iOS/Midgar.framework` into your application’s Xcode project (General > Linked Frameworks and Libraries.).
+
+### Integration
 
 The integration entirely happens in the `AppDelegate.swift` implementation file.
 
