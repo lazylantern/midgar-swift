@@ -12,7 +12,7 @@ Midgar is available through CocoaPods and Carthage.
 
 ### CocoaPods Setup
 
-Add the source and pod to your Podfile as follow:
+1. Add the source and pod to your Podfile as follow:
 
 ```ruby
 platform :ios, 'x.0'
@@ -29,27 +29,33 @@ target 'your-app-name' do
 end
 ```
 
-Run `pod install`.
+2. Run `pod install`.
 
 ### Carthage Setup
 
-Add `github "lazylantern/midgar-swift"` to your Cartfile.
+1. Add `github "lazylantern/midgar-swift"` to your Cartfile.
 
-Run `carthage update`.
+2. Run `carthage update`.
 
-Drag the built framework at `Carthage/Build/iOS/Midgar.framework` into your application’s Xcode project (General > Linked Frameworks and Libraries.).
+3. Drag the built framework at `Carthage/Build/iOS/Midgar.framework` into your linked frameworks (Xcode Project > [Your Application Target] > General > Linked Frameworks and Libraries).
+
+Go to Xcode Project > [Your Application Target] > Build Phases. 
+
+If using Carthage for the first time, click the + icon and choose New Run Script Phase. In the script area below the shell, add `/usr/local/bin/carthage copy-frameworks`.
+
+4. Add `$(SRCROOT)/Carthage/Build/iOS/Midgar.framework` under “Input Files".
 
 ### Integration
 
 The integration entirely happens in the `AppDelegate.swift` implementation file.
 
-Import the module:
+1. Import the module:
 
 ```
 import MidgarSwift
 ```
 
-Declare the `midgarWindow` variable and modify the `window` property getter to return the `midgarWindow`:
+2. Declare the `midgarWindow` variable and modify the `window` property getter to return the `midgarWindow`:
 
 ```
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -65,7 +71,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     
 ```
 
-Start the Midgar SDK in the `applicationDidFinishLaunchingWithOptions` method:
+3. Start the Midgar SDK in the `applicationDidFinishLaunchingWithOptions` method:
 
 ```
 func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
